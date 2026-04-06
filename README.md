@@ -2,7 +2,7 @@
 
 A Home Assistant add-on that runs [Snapcast](https://github.com/snapcast/snapcast) server for synchronized multi-room audio streaming.
 
-Includes optional [Snapweb](https://github.com/badaix/snapweb) UI and [Librespot](https://github.com/librespot-org/librespot) (Spotify Connect) support.
+Includes optional [Snapweb](https://github.com/snapcast/snapweb) UI and [Librespot](https://github.com/librespot-org/librespot) (Spotify Connect) support.
 
 ## Architecture
 
@@ -115,7 +115,7 @@ From here you can see connected clients, adjust volumes, and manage groups.
 - **Base image**: Alpine Linux (hassio-addons/base)
 - **Snapcast**: v0.35.0 from Alpine edge/community
 - **Librespot**: v0.8.0 from Alpine edge/testing
-- **Snapweb**: v0.9.2 from Alpine edge/community
+- **Snapweb**: v0.9.3 from [GitHub releases](https://github.com/snapcast/snapweb/releases)
 - **Supported architectures**: amd64, aarch64
 
 ## Running Tests
