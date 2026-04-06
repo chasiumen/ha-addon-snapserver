@@ -229,6 +229,75 @@ for field in "name:" "url:" "maintainer:"; do
     fi
 done
 
+# --- Test 7: MA control script ---
+echo ""
+echo "--- MA control script ---"
+
+CONTROLPY="$REPO_DIR/snapserver/plug-ins/control.py"
+
+if [ -f "$CONTROLPY" ]; then
+    pass "control.py exists"
+else
+    fail "control.py missing at snapserver/plug-ins/control.py"
+fi
+
+if grep -q 'MusicAssistantControl' "$CONTROLPY"; then
+    pass "control.py has MusicAssistantControl class"
+else
+    fail "control.py missing MusicAssistantControl class"
+fi
+
+if grep -q 'import shortuuid' "$CONTROLPY"; then
+    pass "control.py imports shortuuid"
+else
+    fail "control.py missing shortuuid import"
+fi
+
+if grep -q 'def format_ip_for_url' "$CONTROLPY"; then
+    pass "control.py has inlined format_ip_for_url helper"
+else
+    fail "control.py missing format_ip_for_url (should be inlined, not imported from MA)"
+fi
+
+if grep -q 'plug-ins/control.py' "$DOCKERFILE"; then
+    pass "Dockerfile copies control.py to plug-ins directory"
+else
+    fail "Dockerfile missing COPY for control.py"
+fi
+
+if grep -q 'shortuuid' "$DOCKERFILE"; then
+    pass "Dockerfile installs shortuuid dependency"
+else
+    fail "Dockerfile missing shortuuid pip install"
+fi
+
+if grep -q 'python3' "$DOCKERFILE"; then
+    pass "Dockerfile installs python3"
+else
+    fail "Dockerfile missing python3 installation"
+fi
+
+# --- Test 8: translations ---
+echo ""
+echo "--- translations ---"
+
+TRANSLATIONS="$REPO_DIR/snapserver/translations/en.yaml"
+
+if [ -f "$TRANSLATIONS" ]; then
+    pass "translations/en.yaml exists"
+else
+    fail "translations/en.yaml missing"
+fi
+
+# Check all config options have translations
+for opt in codec buffer_ms sampleformat snapweb_enabled librespot_enabled librespot_name librespot_bitrate initial_volume; do
+    if grep -q "$opt:" "$TRANSLATIONS"; then
+        pass "translations has description for '$opt'"
+    else
+        fail "translations missing description for '$opt'"
+    fi
+done
+
 # --- Summary ---
 echo ""
 echo "================================"

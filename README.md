@@ -110,12 +110,19 @@ http://<HA-server-ip>:1780
 
 From here you can see connected clients, adjust volumes, and manage groups.
 
+## Music Assistant Compatibility
+
+This addon includes the Music Assistant control script (`control.py`) that enables full integration with [Music Assistant](https://music-assistant.io/). When MA creates Snapcast streams, the control script bridges playback commands (play, pause, next, previous, seek, shuffle, repeat) between MA and Snapserver.
+
+No additional configuration is needed — the control script is automatically available at `/usr/share/snapserver/plug-ins/control.py`.
+
 ## Technical Details
 
 - **Base image**: Alpine Linux (hassio-addons/base)
 - **Snapcast**: v0.35.0 from Alpine edge/community
 - **Librespot**: v0.8.0 from Alpine edge/testing
 - **Snapweb**: v0.9.3 from [GitHub releases](https://github.com/snapcast/snapweb/releases)
+- **MA control script**: from [music-assistant/server](https://github.com/music-assistant/server) with inlined helpers
 - **Supported architectures**: amd64, aarch64
 
 ## Running Tests
