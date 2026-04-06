@@ -1,0 +1,36 @@
+set_codec:
+  fields:
+    codec:
+      required: true
+      selector:
+        select:
+          options:
+            - flac
+            - pcm
+            - opus
+            - vorbis
+
+set_sampleformat:
+  fields:
+    sampleformat:
+      required: true
+      selector:
+        select:
+          options:
+            - "44100:16:1"
+            - "44100:16:2"
+            - "48000:16:2"
+            - "48000:24:2"
+            - "96000:24:2"
+
+set_buffer:
+  fields:
+    buffer_ms:
+      required: true
+      selector:
+        number:
+          min: 500
+          max: 5000
+          step: 100
+          unit_of_measurement: ms
+          mode: slider

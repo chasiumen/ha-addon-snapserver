@@ -34,6 +34,18 @@ Audio Source (Music Assistant, Navidrome, Spotify, etc.)
 | `librespot_bitrate` | `320` | Spotify bitrate: `96`, `160`, or `320` |
 | `initial_volume` | `100` | Initial volume for Spotify (0-100) |
 
+### Audio Quality Presets
+
+Audio quality is controlled server-side via `sampleformat` and `codec`. All clients receive the same format.
+
+| Preset | `sampleformat` | `codec` | Use Case |
+|--------|---------------|---------|----------|
+| CD Quality | `44100:16:2` | `flac` | Standard music listening |
+| High Quality (default) | `48000:16:2` | `flac` | Good balance of quality and bandwidth |
+| Hi-Res | `96000:24:2` | `flac` | Audiophile, requires more bandwidth |
+| Low Bandwidth | `44100:16:2` | `opus` | Remote clients or slow networks |
+| Mono Output | `48000:16:1` | `flac` | Single speaker setups |
+
 ## Ports
 
 | Port | Protocol | Description |
@@ -59,12 +71,86 @@ Enable `librespot_enabled` in the config. Snapserver uses its built-in librespot
 
 ### Windows
 
+#### Basic Setup
+
 1. Download `snapclient_win64.zip` from [Snapcast releases](https://github.com/snapcast/snapcast/releases/tag/v0.35.0)
-2. Extract and run:
+2. Extract to a folder (e.g., `C:\snapclient\`)
+3. Open Command Prompt or PowerShell in that folder and run:
    ```
    snapclient.exe -h <HA-server-ip>
    ```
-3. Optional: create a Task Scheduler entry to auto-start on login
+
+#### List Available Audio Outputs
+
+```
+snapclient.exe -l
+```
+
+This shows all audio devices with their IDs, e.g.:
+
+```
+0: Speakers (Realtek High Definition Audio)
+1: Digital Audio (S/PDIF) (Realtek High Definition Audio)
+2: Headphones (USB Audio Device)
+```
+
+#### Select a Specific Output Device
+
+```
+snapclient.exe -h <HA-server-ip> -s <device_id>
+```
+
+For example, to play through the USB headphones (device 2):
+
+```
+snapclient.exe -h 192.168.1.34 -s 2
+```
+
+#### Multiple Outputs (Multi-Room on One PC)
+
+Run multiple instances, each targeting a different audio device:
+
+```
+snapclient.exe -h <HA-server-ip> -s 0 --instance 1
+snapclient.exe -h <HA-server-ip> -s 2 --instance 2
+```
+
+Each instance appears as a separate client in Snapweb and HA, so you can control volumes independently.
+
+#### Auto-Start on Login (Task Scheduler)
+
+1. Open **Task Scheduler** and click **Create Basic Task**
+2. Name: `Snapclient`
+3. Trigger: **When I log on**
+4. Action: **Start a program**
+   - Program: `C:\snapclient\snapclient.exe`
+   - Arguments: `-h <HA-server-ip> -s <device_id>`
+5. Finish and check **Open the Properties dialog** → under General, check **Run whether user is logged on or not**
+
+#### Auto-Start as a Windows Service
+
+For headless/always-on setups, install as a Windows service using [NSSM](https://nssm.cc/):
+
+```
+nssm install Snapclient "C:\snapclient\snapclient.exe" "-h <HA-server-ip> -s <device_id>"
+nssm start Snapclient
+```
+
+#### All Client Options
+
+```
+snapclient.exe --help
+```
+
+Key options:
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `-h <ip>` | Server IP address | `-h 192.168.1.34` |
+| `-s <id>` | Audio output device ID (from `-l`) | `-s 2` |
+| `--instance <n>` | Instance number (for multiple clients) | `--instance 1` |
+| `-p <port>` | Server port (default 1704) | `-p 1704` |
+| `--latency <ms>` | Additional latency in ms | `--latency 0` |
 
 ### Linux
 
@@ -95,6 +181,26 @@ After the add-on is running, add the built-in **Snapcast** integration in HA:
 3. Host: `localhost`, Port: `1705`
 
 This creates `media_player` entities for each connected Snapclient that you can control from HA (volume, mute, group).
+
+### Snapserver Control Integration (optional)
+
+A companion integration is included in `custom_components/snapserver_control/` that lets you control audio quality settings from the HA UI:
+
+1. Copy `custom_components/snapserver_control/` to your HA `config/custom_components/` directory
+2. Restart HA
+3. Go to **Settings > Devices & Services > Add Integration > Snapserver Control**
+
+This creates:
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| `select.snapserver_audio_codec` | Select | Switch between flac, pcm, opus, vorbis |
+| `select.snapserver_sample_format` | Select | Change sample rate/depth/channels |
+| `number.snapserver_buffer_size` | Slider | Adjust buffer 500-5000ms |
+
+Plus three services for automations: `snapserver_control.set_codec`, `snapserver_control.set_sampleformat`, `snapserver_control.set_buffer`.
+
+**Note:** Changing these settings restarts the Snapserver addon, which briefly disconnects all clients (1-3 seconds).
 
 ### Using with Navidrome
 
@@ -128,7 +234,11 @@ No additional configuration is needed — the control script is automatically av
 ## Running Tests
 
 ```bash
+# Addon tests (68 tests)
 bash tests/test_config.sh
+
+# Companion integration tests (45 tests)
+bash tests/test_companion.sh
 ```
 
 ## Troubleshooting
