@@ -1,0 +1,41 @@
+name: Snapserver
+version: 0.1.0
+slug: snapserver
+description: Snapcast server with optional Snapweb UI and Librespot (Spotify Connect)
+url: https://github.com/chasiumen/ha-addon-snapserver
+arch:
+  - amd64
+  - aarch64
+host_network: true
+audio: true
+init: false
+map:
+  - share:rw
+ports:
+  1704/tcp: 1704
+  1705/tcp: 1705
+  1780/tcp: 1780
+  4953/tcp: 4953
+ports_description:
+  1704/tcp: Snapcast client connections
+  1705/tcp: Snapcast control / JSON-RPC
+  1780/tcp: Snapweb UI
+  4953/tcp: TCP audio input stream
+options:
+  codec: flac
+  buffer_ms: 1000
+  sampleformat: "48000:16:2"
+  snapweb_enabled: true
+  librespot_enabled: false
+  librespot_name: Snapserver
+  librespot_bitrate: 320
+  initial_volume: 100
+schema:
+  codec: list(flac|pcm|opus|vorbis)
+  buffer_ms: int
+  sampleformat: str
+  snapweb_enabled: bool
+  librespot_enabled: bool
+  librespot_name: str
+  librespot_bitrate: list(96|160|320)
+  initial_volume: int(0,100)

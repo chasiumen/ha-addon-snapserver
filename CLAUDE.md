@@ -18,9 +18,11 @@ Navidrome -> Music Assistant (HA) -> Snapserver (addon) -> Snapclient (Windows P
 - **Three components:**
   - Snapserver (always on, core)
   - Snapweb (toggleable via config bool) — browser-based client control UI on port 1780
-  - Librespot (toggleable via config bool) — Spotify Connect receiver feeding into Snapserver via pipe
-- Use latest stable Snapcast v0.35.0 from https://github.com/snapcast/snapcast/releases
+  - Librespot (toggleable via config bool) — Spotify Connect via snapserver's built-in librespot:// source
+- Use Alpine edge packages: snapcast-server 0.35.0, librespot 0.8.0, snapweb 0.9.2
+- Base image: ghcr.io/hassio-addons/base:16.3.2 (Alpine-based, includes bashio)
 - Support amd64 and aarch64 architectures
+- Librespot has NO pre-built binaries on GitHub — must use Alpine package
 
 ## Addon File Structure
 ```
@@ -60,5 +62,12 @@ repo-root/
 ## Related Repo
 - The Navidrome HA integration lives at ha-music-assistant (separate repo)
 
+## Validation
+- 51 tests pass (bash tests/test_config.sh)
+- Verified Alpine edge has all packages at correct versions
+- Verified snapserver.conf section names match official docs ([tcp-control], [tcp-streaming], [stream])
+- Verified librespot:// is a built-in snapserver source type (no separate pipe/process needed)
+- Verified snapweb is available as Alpine package (no separate download)
+
 ## Status
-Implementation has not started yet. Start by creating the addon file structure and implementing Dockerfile, config.yaml, and run.sh.
+Implementation complete. Ready for deployment and testing on HA.
