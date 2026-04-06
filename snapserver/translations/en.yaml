@@ -1,0 +1,47 @@
+---
+configuration:
+  codec:
+    name: Audio Codec
+    description: >-
+      The audio codec used for streaming to clients. FLAC is lossless and
+      recommended for local networks. Use Opus or Vorbis for lower bandwidth.
+  buffer_ms:
+    name: Buffer Size (ms)
+    description: >-
+      Buffer size in milliseconds. Higher values reduce audio dropouts but
+      increase latency. Default is 1000ms. Try 1500-2000 if you hear choppy
+      audio.
+  sampleformat:
+    name: Sample Format
+    description: >-
+      Audio sample format as rate:bits:channels. Default is 48000:16:2
+      (48kHz, 16-bit, stereo). CD quality is 44100:16:2.
+  snapweb_enabled:
+    name: Enable Snapweb UI
+    description: >-
+      Enable the Snapweb browser-based control interface on port 1780.
+      Lets you see connected clients, adjust volumes, and manage groups
+      from any browser.
+  librespot_enabled:
+    name: Enable Spotify Connect
+    description: >-
+      Enable Librespot, a Spotify Connect receiver. When enabled, your
+      Snapserver appears as a Spotify device on your network. Audio from
+      Spotify is streamed to all connected Snapclients. Requires a Spotify
+      Premium account.
+  librespot_name:
+    name: Spotify Device Name
+    description: >-
+      The name shown in the Spotify app's device list. Only used when
+      Spotify Connect is enabled.
+  librespot_bitrate:
+    name: Spotify Bitrate
+    description: >-
+      Audio quality for Spotify streams. 320 kbps is the highest quality
+      available with Spotify Premium. Only used when Spotify Connect
+      is enabled.
+  initial_volume:
+    name: Initial Volume
+    description: >-
+      The initial volume level (0-100) for Spotify Connect playback.
+      Only used when Spotify Connect is enabled.
