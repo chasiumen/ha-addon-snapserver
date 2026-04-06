@@ -127,6 +127,13 @@ else
     fail "Dockerfile should use Alpine repos (not Debian)"
 fi
 
+if grep -q 'github.com/snapcast/snapweb' "$DOCKERFILE"; then
+    pass "Dockerfile downloads snapweb from snapcast/snapweb"
+else
+    fail "Dockerfile should download snapweb from github.com/snapcast/snapweb"
+fi
+
+
 # --- Test 4: run.sh validation ---
 echo ""
 echo "--- run.sh ---"
