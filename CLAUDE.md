@@ -83,5 +83,66 @@ repo-root/
 
 **Fix:** Already resolved — `host_network: true` makes all ports available without mapping.
 
+## Planned: Server-Side Audio Quality Controls via HA Entities
+
+### Goal
+Expose Snapserver audio quality settings as HA entities so users can adjust codec, sample format, and buffer from the HA UI or automations — without going to the addon config page.
+
+### Architecture
+This requires a **companion HA integration** (separate from the addon) that communicates with the Snapserver addon.
+
+```
+HA UI / Automation → Snapserver Integration (custom_components/snapserver_control/)
+  → Reads/writes addon config via Supervisor API
+  → Restarts addon when settings change
+```
+
+### Entities to Create
+
+| Entity Type | Entity | Values | Notes |
+|---|---|---|---|
+| `select` | `select.snapserver_codec` | flac, pcm, opus, vorbis | Changing restarts snapserver |
+| `select` | `select.snapserver_sampleformat` | 44100:16:2, 48000:16:2, 96000:24:2, etc. | Preset list + custom option |
+| `number` | `number.snapserver_buffer` | 500-5000 ms | Changing restarts snapserver |
+| `select` | `select.snapserver_channels` | Stereo (2), Mono (1) | Derived from sampleformat |
+
+### Implementation Approach
+
+**Option A: Companion HA integration (recommended)**
+- New repo or folder: `custom_components/snapserver_control/`
+- Uses HA Supervisor API to read/write addon options: `POST /addons/24c8c63c_snapserver/options`
+- Uses HA Supervisor API to restart addon: `POST /addons/24c8c63c_snapserver/restart`
+- Creates select/number entities that reflect current addon config
+- On entity change → update addon config → restart addon
+- Warning: restart drops all client connections for a few seconds
+
+**Option B: Snapserver JSON-RPC API**
+- Snapserver has a JSON-RPC API on port 1705
+- Some settings can be changed at runtime via `Server.SetProperty` or `Stream.SetStream`
+- Limited: codec and sampleformat may require restart anyway
+- Advantage: no addon restart for supported settings
+
+**Option C: Custom services only (simplest)**
+- Register services like `snapserver.set_codec(codec)`, `snapserver.set_quality(preset)`
+- No entities, just callable services
+- Can be used in automations and scripts
+- Least UI-friendly but fastest to implement
+
+### Recommended: Start with Option C, evolve to Option A
+1. First implement custom services (quick, useful for automations)
+2. Then add select/number entities that call those services
+3. Investigate JSON-RPC for runtime changes without restart
+
+### Implementation Steps
+1. Create `custom_components/snapserver_control/` integration
+2. Config flow: auto-detect Snapserver addon by slug
+3. Register services: `set_codec`, `set_sampleformat`, `set_buffer`
+4. Services read current addon config via Supervisor API, update, restart
+5. Add select/number entities that wrap the services
+6. Tests for service calls and entity state
+
+### Caveat
+Changing codec/sampleformat/buffer **restarts snapserver**, which temporarily disconnects all clients (1-3 seconds). The integration should warn the user or require confirmation for changes that trigger a restart.
+
 ## Status
-All known issues fixed. Addon includes MA control script, config descriptions, and 68 validation tests.
+All known issues fixed. Addon includes MA control script, config descriptions, and 68 validation tests. Server-side audio quality controls planned as next enhancement.

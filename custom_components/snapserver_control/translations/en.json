@@ -1,0 +1,48 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Snapserver Control",
+        "description": "This integration creates entities to control your Snapserver addon's audio quality settings. The Snapserver addon must be installed first."
+      }
+    },
+    "error": {
+      "addon_not_found": "Snapserver addon not found. Please install the Snapserver addon first."
+    },
+    "abort": {
+      "already_configured": "Snapserver Control is already configured."
+    }
+  },
+  "services": {
+    "set_codec": {
+      "name": "Set Audio Codec",
+      "description": "Change the Snapserver audio codec. This restarts the server and briefly disconnects all clients.",
+      "fields": {
+        "codec": {
+          "name": "Codec",
+          "description": "Audio codec: flac (lossless), pcm (uncompressed), opus, or vorbis"
+        }
+      }
+    },
+    "set_sampleformat": {
+      "name": "Set Sample Format",
+      "description": "Change the Snapserver sample format (rate:bits:channels). This restarts the server and briefly disconnects all clients.",
+      "fields": {
+        "sampleformat": {
+          "name": "Sample Format",
+          "description": "Sample format as rate:bits:channels (e.g., 48000:16:2)"
+        }
+      }
+    },
+    "set_buffer": {
+      "name": "Set Buffer Size",
+      "description": "Change the Snapserver buffer size in milliseconds. This restarts the server and briefly disconnects all clients.",
+      "fields": {
+        "buffer_ms": {
+          "name": "Buffer (ms)",
+          "description": "Buffer size in milliseconds (500-5000)"
+        }
+      }
+    }
+  }
+}
