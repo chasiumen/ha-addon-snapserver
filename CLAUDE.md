@@ -50,6 +50,7 @@ repo-root/
 - 1704/tcp — Snapcast protocol (client connections)
 - 1705/tcp — Snapcast control
 - 1780/tcp — Snapweb UI / JSON-RPC API
+- 4953-5153/tcp — TCP audio input streams (Music Assistant dynamically creates streams in this range)
 
 ## Windows Client Setup
 - Download `snapclient.exe` from https://github.com/snapcast/snapcast/releases
@@ -70,5 +71,35 @@ repo-root/
 - Verified librespot:// is a built-in snapserver source type (no separate pipe/process needed)
 - Verified snapweb must be downloaded from GitHub releases (not an Alpine package)
 
+## Known Issues & Required Fixes
+
+### ISSUE 1: Missing Music Assistant control script (CRITICAL)
+**Error:** `controlscript '/usr/share/snapserver/plug-ins/control.py' does not exist`
+
+Music Assistant sends a `Stream.AddStream` JSON-RPC request to Snapserver that references `controlscript=control.py`. This is a Music Assistant-specific plugin that must be bundled in the addon at `/usr/share/snapserver/plug-ins/control.py`.
+
+**Fix:** Research the MA Snapcast control script (check the Music Assistant source code at https://github.com/music-assistant/server — look for `control.py` or snapcast-related plugin files). Download or bundle it in the Dockerfile and place it at `/usr/share/snapserver/plug-ins/control.py`.
+
+**Actual error log:**
+```
+Server::onMessageReceived JsonRequestException: {"error":{"code":-32602,"data":"controlscript '/usr/share/snapserver/plug-ins/control.py' does not exist","message":"Invalid params"},"id":null,"jsonrpc":"2.0"}, message: {"id":491,"jsonrpc":"2.0","method":"Stream.AddStream","params":{"streamUri":"tcp://0.0.0.0:5097?sampleformat=48000:16:2&idle_threshold=60000&controlscript=control.py&controlscriptparams=--queueid=ma_74563c4f1317%20--socket=%2Ftmp%2Fma-snapcast-ma_74563c4f1317.sock%20--streamserver-ip=192.168.1.34%20--streamserver-port=8097&name=Music Assistant - ma74563c4f1317"}}
+```
+
+### ISSUE 2: TCP port range for Music Assistant streams
+**Error:** `Unable to create stream - No free port found`
+
+Music Assistant dynamically creates TCP streams on Snapserver using ports in the range **4953-5153**. The addon currently only exposes port 4953. The full range needs to be available.
+
+**Fix options (pick one):**
+- Expose the full port range 4953-5153 in config.yaml
+- Or use `host_network: true` in config.yaml to avoid port mapping entirely (simpler, recommended for audio addons)
+
+## Plan / TODO
+
+1. **Research the MA control script** — find `control.py` in the Music Assistant server source code and determine how to bundle it
+2. **Update Dockerfile** — include the control script at `/usr/share/snapserver/plug-ins/control.py`
+3. **Fix port range** — either expose 4953-5153 or switch to host networking in config.yaml
+4. **Rebuild and test** — verify Music Assistant can create streams and audio reaches the Windows Snapclient
+
 ## Status
-Implementation complete. Ready for deployment and testing on HA.
+Addon is built and running. Snapclient on Windows connects successfully. But playback fails due to the two issues above. These must be fixed before audio can flow.
