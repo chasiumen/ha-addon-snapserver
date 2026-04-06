@@ -1,5 +1,5 @@
 name: Snapserver
-version: 0.2.0
+version: 0.3.0
 slug: snapserver
 description: Snapcast server with optional Snapweb UI and Librespot (Spotify Connect)
 url: https://github.com/chasiumen/ha-addon-snapserver
