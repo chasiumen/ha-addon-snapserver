@@ -3,14 +3,42 @@
     "step": {
       "user": {
         "title": "Snapserver Control",
-        "description": "This integration creates entities to control your Snapserver addon's audio quality settings. The Snapserver addon must be installed first."
+        "description": "This integration creates entities to control your Snapserver addon's audio quality settings and to monitor which Snapcast clients are connected. The Snapserver addon must be installed and running.",
+        "data": {
+          "rpc_host": "Snapserver host",
+          "rpc_port": "Control port"
+        },
+        "data_description": {
+          "rpc_host": "Leave this at 127.0.0.1 unless Home Assistant cannot reach the addon over localhost.",
+          "rpc_port": "Snapserver's JSON-RPC control port. The addon uses 1705."
+        }
       }
     },
     "error": {
-      "addon_not_found": "Snapserver addon not found. Please install the Snapserver addon first."
+      "addon_not_found": "Snapserver addon not found. Please install the Snapserver addon first.",
+      "cannot_connect": "Could not reach Snapserver's control port. Check that the addon is running, then try again."
     },
     "abort": {
       "already_configured": "Snapserver Control is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Snapserver Control",
+        "description": "Where to reach Snapserver's JSON-RPC control socket. Saving reconnects the integration.",
+        "data": {
+          "rpc_host": "Snapserver host",
+          "rpc_port": "Control port"
+        },
+        "data_description": {
+          "rpc_host": "Leave this at 127.0.0.1 unless Home Assistant cannot reach the addon over localhost.",
+          "rpc_port": "Snapserver's JSON-RPC control port. The addon uses 1705."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach Snapserver's control port. Check that the addon is running, then try again."
     }
   },
   "services": {
@@ -41,6 +69,16 @@
         "buffer_ms": {
           "name": "Buffer (ms)",
           "description": "Buffer size in milliseconds (500-5000)"
+        }
+      }
+    },
+    "delete_client": {
+      "name": "Delete Client",
+      "description": "Permanently remove a client from Snapserver. Use this for a client that will never reconnect, such as a machine whose network adapter changed, so it stops showing as disconnected.",
+      "fields": {
+        "client_id": {
+          "name": "Client ID",
+          "description": "The client's ID, which is its MAC address (see the client_id attribute on its connectivity sensor)."
         }
       }
     }
