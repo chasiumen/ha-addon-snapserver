@@ -3,8 +3,9 @@
   "name": "Snapserver Control",
   "codeowners": ["@chasiumen"],
   "config_flow": true,
+  "dependencies": ["frontend", "http"],
   "documentation": "https://github.com/chasiumen/ha-addon-snapserver",
   "integration_type": "service",
   "iot_class": "local_push",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

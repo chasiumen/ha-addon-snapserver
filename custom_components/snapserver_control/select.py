@@ -25,7 +25,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Snapserver Control select entities."""
-    client = entry.runtime_data
+    client = entry.runtime_data.supervisor
     options = await client.get_addon_options()
 
     async_add_entities([

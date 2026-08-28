@@ -190,6 +190,8 @@ A companion integration is included in `custom_components/snapserver_control/` t
 2. Restart HA
 3. Go to **Settings > Devices & Services > Add Integration > Snapserver Control**
 
+During setup you are asked for the Snapserver control socket. Leave it at `127.0.0.1:1705` unless Home Assistant cannot reach the addon over localhost; you can change it later via the integration's **Configure** button.
+
 This creates:
 
 | Entity | Type | Description |
@@ -197,10 +199,55 @@ This creates:
 | `select.snapserver_audio_codec` | Select | Switch between flac, pcm, opus, vorbis |
 | `select.snapserver_sample_format` | Select | Change sample rate/depth/channels |
 | `number.snapserver_buffer_size` | Slider | Adjust buffer 500-5000ms |
+| `sensor.snapserver_clients_connected` | Sensor | How many clients are connected, with the full roster as an attribute |
+| `sensor.snapserver_stream_status` | Sensor | Whether the stream is `playing` or `idle` |
+| `binary_sensor.snapserver_control_connection` | Connectivity | Whether the integration can reach Snapserver at all |
 
-Plus three services for automations: `snapserver_control.set_codec`, `snapserver_control.set_sampleformat`, `snapserver_control.set_buffer`.
+Plus, for every Snapcast client the server knows about, its own device with:
 
-**Note:** Changing these settings restarts the Snapserver addon, which briefly disconnects all clients (1-3 seconds).
+| Entity | Type | Description |
+|--------|------|-------------|
+| `binary_sensor.<client>_connected` | Connectivity | On while that client is connected |
+| `sensor.<client>_last_seen` | Timestamp | Renders as "12 minutes ago" once a client drops |
+
+Services for automations: `snapserver_control.set_codec`, `snapserver_control.set_sampleformat`, `snapserver_control.set_buffer`, and `snapserver_control.delete_client` (permanently forget a client that will never reconnect, e.g. a machine whose network adapter changed).
+
+**Note:** Changing codec, sample format, or buffer restarts the Snapserver addon, which briefly disconnects all clients (1-3 seconds). The status entities do not — they read Snapserver's control API and never restart anything.
+
+### Client Status Card
+
+The integration ships a Lovelace card showing which clients are up and, for the ones that aren't, how long they've been gone. It is registered automatically — just add it to a dashboard:
+
+```yaml
+type: custom:snapcast-clients-card
+entity: sensor.snapserver_clients_connected
+title: Speakers
+```
+
+```
+● Windows PC          192.168.1.42 · v0.31.0          Connected
+● Kitchen Pi          192.168.1.55 · v0.31.0     Last seen 12m ago
+```
+
+Options: `title` (default "Speakers") and `hide_disconnected: true` to show only live clients. Clicking a row opens that client's more-info dialog. If Snapserver itself becomes unreachable the card says so, rather than showing every client as dead.
+
+If the card doesn't appear after copying the integration, hard-refresh the browser (Ctrl+F5) to clear the cached resource list.
+
+To be told about a drop instead of having to look:
+
+```yaml
+automation:
+  - alias: Snapcast client went offline
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.windows_pc_connected
+        to: "off"
+        for: "00:02:00"
+    actions:
+      - action: notify.mobile_app_your_phone
+        data:
+          message: "Snapcast client 'Windows PC' has been offline for 2 minutes."
+```
 
 ### Using with Navidrome
 
@@ -237,8 +284,12 @@ No additional configuration is needed — the control script is automatically av
 # Addon tests (68 tests)
 bash tests/test_config.sh
 
-# Companion integration tests (45 tests)
+# Companion integration tests (76 tests, includes the Python suites below)
 bash tests/test_companion.sh
+
+# Protocol and coordinator unit tests (18 tests, no Home Assistant needed)
+python3 tests/test_rpc.py
+python3 tests/test_coordinator.py
 ```
 
 ## Troubleshooting
@@ -246,4 +297,6 @@ bash tests/test_companion.sh
 - **No sound on client**: Ensure the client can reach port 1704 on your HA server. Check firewall rules.
 - **Choppy audio**: Increase `buffer_ms` (try 1500 or 2000).
 - **Spotify not showing**: Ensure `librespot_enabled` is true and restart the add-on. Your Spotify app must be on the same network.
+- **Windows client keeps dying**: `snapclient.exe` exits when Windows switches the default output device (e.g. line-out to headphones). Pin the device with `-s <device>` so a default change is ignored, and run it as a service with restart-on-failure (see [Auto-Start as a Windows Service](#auto-start-as-a-windows-service)) so it recovers on its own. The Client Status Card tells you when this has happened.
+- **Client status entities never appear**: The integration talks to Snapserver's control API on port 1705. Check `binary_sensor.snapserver_control_connection` — if it is off, the addon is stopped or the host/port in the integration's **Configure** dialog is wrong.
 - **Check logs**: Go to the add-on page in HA and click the **Log** tab.

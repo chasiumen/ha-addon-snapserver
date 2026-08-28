@@ -34,3 +34,11 @@ set_buffer:
           step: 100
           unit_of_measurement: ms
           mode: slider
+
+delete_client:
+  fields:
+    client_id:
+      required: true
+      example: "00:21:6a:7d:74:fc"
+      selector:
+        text:
