@@ -352,10 +352,52 @@ mitigations on the Windows host, outside this repo:
 - `snapclient.exe -s <device>` to pin the output device so a default-device change is ignored.
 - Run it under NSSM (or a Scheduled Task with restart-on-failure) so it self-recovers.
 
+## Implemented: HACS Installability for the Companion Integration
+
+### Problem
+`custom_components/snapserver_control/` could only be installed by manually copying the folder
+onto the HA box — no update mechanism, no versioning.
+
+### Fix
+Added `hacs.json` at the repo root, matching the `ha-music-assistant` repo's pattern. This repo
+now serves two independent HA discovery systems from the same tree:
+
+- **Supervisor Add-on Store** reads `repository.yaml` + the `snapserver/` folder (unchanged).
+- **HACS** reads `hacs.json` + `custom_components/snapserver_control/` (already at repo root
+  with a valid `manifest.json`, so no restructuring was needed).
+
+Neither system inspects the other's files, so they coexist without conflict. In HACS, this repo
+must be added **twice** — once as an Add-on Store repository (already done), once as a HACS
+custom repository under category **Integration** — because they're separate registrations even
+though the URL is identical.
+
+### Verified — no conflict with the official HA `snapcast` integration
+Checked `home-assistant/core`'s `homeassistant/components/snapcast/` source directly (not from
+memory):
+- Domain is `snapcast` (core) vs `snapserver_control` (ours) — no collision.
+- Core's integration is a pure controller: it uses the `snapcast` PyPI library to open its own
+  JSON-RPC connection to an existing Snapserver on the same control port (1705) our `rpc.py`
+  uses. Snapserver's control API is designed for multiple simultaneous controllers (Snapweb,
+  mobile apps, HA, etc. all connect concurrently already), so two more persistent connections is
+  normal, not a resource conflict. Confirmed via <https://www.home-assistant.io/integrations/snapcast/>:
+  it explicitly "does not run a Snapcast server itself... connects to an already-running
+  Snapserver instance."
+- Core creates only `media_player.snapcast_client_*` entities and registers no HA devices
+  (checked `entity.py` and `media_player.py`) — no entity_id or device_registry overlap with
+  our per-client `binary_sensor`/`sensor` entities and devices.
+- The addon's bundled `control.py` (from Music Assistant's own Snapcast provider) is unrelated
+  to all of this — it's a per-stream playback-control bridge launched by snapserver itself, not
+  a server, and not something either integration talks to.
+
+### Not done
+No GitHub releases/tags exist yet (`git tag -l` is empty), so HACS will track the default
+branch rather than showing a real version number. Cutting releases (e.g. `v0.3.0` for the addon,
+a `snapserver_control-vX.Y.Z` tag for the integration) would clean this up but wasn't requested.
+
 ## Status
 Addon includes MA control script and config descriptions. Server-side audio quality controls
 and client status monitoring are both shipped in the `snapserver_control` companion
-integration.
+integration, which is now installable via HACS as well as manual copy.
 
 **Tests:** `tests/test_companion.sh` 76/76 pass (this runs the two Python suites, 18 tests,
 as its last section). `tests/test_config.sh` 66/68 — the 2 failures come from an uncommitted

@@ -229,6 +229,36 @@ for field in "name:" "url:" "maintainer:"; do
     fi
 done
 
+# --- Test 6b: hacs.json validation ---
+# This repo doubles as a HACS integration repository for
+# custom_components/snapserver_control/ alongside the Add-on Store repo above;
+# the two coexist because HACS and the Supervisor Add-on Store read different
+# root files and never inspect each other's.
+echo ""
+echo "--- hacs.json ---"
+
+HACSJSON="$REPO_DIR/hacs.json"
+
+if [ -f "$HACSJSON" ]; then
+    pass "hacs.json exists"
+else
+    fail "hacs.json missing"
+fi
+
+for field in '"name"' '"content_in_root"'; do
+    if grep -q "$field" "$HACSJSON"; then
+        pass "hacs.json has $field"
+    else
+        fail "hacs.json missing $field"
+    fi
+done
+
+if grep -q '"content_in_root": false' "$HACSJSON"; then
+    pass "hacs.json declares content_in_root: false (custom_components/ layout)"
+else
+    fail "hacs.json should declare content_in_root: false"
+fi
+
 # --- Test 7: MA control script ---
 echo ""
 echo "--- MA control script ---"

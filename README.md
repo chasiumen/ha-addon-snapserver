@@ -184,11 +184,18 @@ This creates `media_player` entities for each connected Snapclient that you can 
 
 ### Snapserver Control Integration (optional)
 
-A companion integration is included in `custom_components/snapserver_control/` that lets you control audio quality settings from the HA UI:
+A companion integration is included in `custom_components/snapserver_control/` that lets you control audio quality settings, and see which Snapcast clients are connected, from the HA UI.
 
-1. Copy `custom_components/snapserver_control/` to your HA `config/custom_components/` directory
-2. Restart HA
-3. Go to **Settings > Devices & Services > Add Integration > Snapserver Control**
+This repo is both an add-on repository (`repository.yaml`, used above for the Snapserver add-on) **and** a HACS integration repository (`hacs.json`, used here) — the two live side by side and don't interfere with each other. Install this piece through HACS rather than copying files by hand:
+
+1. In HACS, go to the three-dot menu > **Custom repositories**
+2. Add `https://github.com/chasiumen/ha-addon-snapserver`, category **Integration**
+   (this is separate from adding it to the Add-on Store — you'll have added the same URL twice, once per store)
+3. Find **Snapserver Control** in HACS and install it
+4. Restart HA
+5. Go to **Settings > Devices & Services > Add Integration > Snapserver Control**
+
+Future updates: click **Update** in HACS, then restart HA — no manual file copying.
 
 During setup you are asked for the Snapserver control socket. Leave it at `127.0.0.1:1705` unless Home Assistant cannot reach the addon over localhost; you can change it later via the integration's **Configure** button.
 
