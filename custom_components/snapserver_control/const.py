@@ -15,13 +15,24 @@ CONF_BUFFER_MS = "buffer_ms"
 
 CODEC_OPTIONS = ["flac", "pcm", "opus", "vorbis"]
 
+# Sample format is owned by MUSIC ASSISTANT, not the addon: MA bakes
+# sampleformat= into its Stream.AddStream URI, overriding the addon's global
+# default, so the select entity writes MA's provider config via ma_client.py.
+# 16-bit only: snapserver <= 0.35.0 lacks packed_s24le ingest (snapcast PR
+# #1532 unmerged) and MA's packed 24-bit output would be misparsed into noise.
+# No 44100 / no mono: MA offers rates (48000, 96000, 192000) and hardcodes
+# channels=2. See docs/PLAN_ma_sampleformat.md for the verified ground truth.
 SAMPLEFORMAT_OPTIONS = [
-    "44100:16:1",
-    "44100:16:2",
     "48000:16:2",
-    "48000:24:2",
-    "96000:24:2",
+    "96000:16:2",
+    "192000:16:2",
 ]
+
+# Music Assistant connection (stored in this integration's config entry).
+CONF_MA_URL = "ma_url"
+CONF_MA_TOKEN = "ma_token"
+MA_INTEGRATION_DOMAIN = "music_assistant"
+DEFAULT_MA_URL = "http://127.0.0.1:8095"
 
 BUFFER_MIN = 500
 BUFFER_MAX = 5000

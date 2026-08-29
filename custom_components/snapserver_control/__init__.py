@@ -11,15 +11,18 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     ATTR_CLIENT_ID,
     CARD_FILENAME,
     CARD_URL,
     CARD_VERSION,
+    CONF_MA_TOKEN,
+    CONF_MA_URL,
     CONF_RPC_HOST,
     CONF_RPC_PORT,
     DEFAULT_RPC_HOST,
@@ -30,6 +33,11 @@ from .const import (
 )
 from .coordinator import SnapserverCoordinator
 from .entity import server_device_info
+from .ma_client import (
+    MusicAssistantApiError,
+    MusicAssistantClient,
+    MusicAssistantScopeError,
+)
 from .supervisor import SupervisorApiError, SupervisorClient
 
 
@@ -39,6 +47,11 @@ class SnapserverControlData:
 
     supervisor: SupervisorClient
     coordinator: SnapserverCoordinator
+    # Music Assistant connection: None until the user configures URL + admin
+    # token, or when MA was unreachable at setup. Only the sample-format
+    # entity needs it; everything else must keep working without it.
+    ma: MusicAssistantClient | None = None
+    ma_instance_id: str | None = None
 
 
 type SnapserverControlConfigEntry = ConfigEntry[SnapserverControlData]
@@ -91,7 +104,30 @@ async def async_setup_entry(
     await coordinator.async_start()
     entry.async_on_unload(coordinator.async_stop)
 
-    entry.runtime_data = SnapserverControlData(supervisor=client, coordinator=coordinator)
+    # Optional Music Assistant connection for the sample-format entity.
+    ma: MusicAssistantClient | None = None
+    ma_instance_id: str | None = None
+    ma_url = entry.options.get(CONF_MA_URL, entry.data.get(CONF_MA_URL))
+    ma_token = entry.options.get(CONF_MA_TOKEN, entry.data.get(CONF_MA_TOKEN))
+    if ma_url and ma_token:
+        ma = MusicAssistantClient(ma_url, ma_token, async_get_clientsession(hass))
+        try:
+            ma_instance_id = await ma.get_snapcast_instance_id()
+        except MusicAssistantApiError as err:
+            # Never fail the whole entry: codec/buffer/client-status must keep
+            # working when MA is down. The sample-format entity goes unavailable.
+            LOGGER.warning(
+                "Music Assistant is unreachable, sample-format control disabled: %s",
+                err,
+            )
+            ma = None
+
+    entry.runtime_data = SnapserverControlData(
+        supervisor=client,
+        coordinator=coordinator,
+        ma=ma,
+        ma_instance_id=ma_instance_id,
+    )
 
     # Per-client devices hang off this one via via_device, and binary_sensor sets
     # up before the platforms that would otherwise create it -- so create it here
@@ -115,12 +151,27 @@ async def async_setup_entry(
         await client.restart_addon()
 
     async def handle_set_sampleformat(call: ServiceCall) -> None:
-        """Handle set_sampleformat service call."""
-        sampleformat = call.data["sampleformat"]
-        options = await client.get_addon_options()
-        options["sampleformat"] = sampleformat
-        await client.set_addon_options(options)
-        await client.restart_addon()
+        """Change MA's stream sample format (the addon-side value is inert).
+
+        MA overrides the addon's global sampleformat per-stream, so this writes
+        Music Assistant's provider config instead and does NOT restart the addon.
+        """
+        data = entry.runtime_data
+        if data.ma is None or data.ma_instance_id is None:
+            raise HomeAssistantError(
+                "Music Assistant is not configured — add its URL and an admin"
+                " token in the Snapserver Control options"
+            )
+        rate = int(str(call.data["sampleformat"]).split(":")[0])
+        try:
+            await data.ma.apply_sampleformat(data.ma_instance_id, rate)
+        except MusicAssistantScopeError as err:
+            raise HomeAssistantError(
+                "The configured Music Assistant token lacks admin rights —"
+                " create a long-lived token for an admin user in the MA web UI"
+            ) from err
+        except MusicAssistantApiError as err:
+            raise HomeAssistantError(f"Failed to update Music Assistant: {err}") from err
 
     async def handle_set_buffer(call: ServiceCall) -> None:
         """Handle set_buffer service call."""
