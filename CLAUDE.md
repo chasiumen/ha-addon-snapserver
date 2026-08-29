@@ -488,8 +488,28 @@ Addon includes MA control script and config descriptions. Server-side audio qual
 and client status monitoring are both shipped in the `snapserver_control` companion
 integration, which is now installable via HACS as well as manual copy. The sample-format
 entity is reworked to write Music Assistant's provider config (the only place the value is
-honored) — implemented per docs/PLAN_ma_sampleformat.md, verified locally by the test suites,
-not yet verified against the live HA instance (see the plan's section 7 checklist).
+honored) — implemented per docs/PLAN_ma_sampleformat.md and **verified live on the user's HA
+instance (2026-08-29)**, addon-log evidence for every claim:
+
+- Entity write → MA re-added its stream at the chosen format, both directions
+  (`Stream.AddStream(...sampleformat=96000:16:2...)` at 01:51:45 and 02:00:13; back to
+  48000:16:2 at 02:05:40). The addon process never restarted.
+- Auto-resume: teardown 02:05:36.0 → AddStream 02:05:40.4 → playing 02:05:40.5 — **4.5 s
+  hands-off recovery** (vs. 45 s + a manual play press when the same change was made in MA's
+  own UI, which bypasses resume.py). Faster than the 8-12 s estimate because MA's reload runs
+  inside the save request, so players are already re-registered when the resume task first
+  polls; the user's idle_threshold=1000 shortens the drain too.
+- External-server mode on: MA's built-in snapserver bind-race spam gone, and MA stopped
+  attaching `controlscript=` to its stream URI — the cross-container control.py socket-error
+  spam is gone as a side effect, as predicted.
+- The old "mono" option confirmed cosmetic by the user's own experiment: hand-adding
+  `48000:16:1` back to SAMPLEFORMAT_OPTIONS and selecting it put `48000:16:2` on the wire
+  (select.py parses only the rate; MA hardcodes channels=2). It also created a silent no-op
+  (rate unchanged → MA's short-circuit → no reload, no log line), which cost a debugging
+  round. Mono for the user's mono-only bass amp is handled by the Windows system-wide "Mono
+  audio" toggle on the client machine — the right layer for it. If mono-on-the-wire is ever
+  really needed, the path is an upstream MA patch (channels config entry through
+  `snapcast_stream_format()`); snapserver itself accepts `:1` fine.
 
 **Tests:** `tests/test_companion.sh` 76/76 pass (this runs the two Python suites, 18 tests,
 as its last section). `tests/test_config.sh` 66/68 — the 2 failures come from an uncommitted
