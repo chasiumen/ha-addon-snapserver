@@ -86,36 +86,67 @@ Enable `librespot_enabled` in the config. Snapserver uses its built-in librespot
 snapclient.exe -l
 ```
 
-This shows all audio devices with their IDs, e.g.:
+Each device is printed as two lines — an index and endpoint GUID, then the friendly name:
 
 ```
-0: Speakers (Realtek High Definition Audio)
-1: Digital Audio (S/PDIF) (Realtek High Definition Audio)
-2: Headphones (USB Audio Device)
+0: default
+Speakers (Realtek(R) Audio)
+
+1: {0.0.0.00000000}.{88299c40-4cc9-45df-80ce-5570d740ace9}
+Speakers (Realtek(R) Audio)
+
+2: {0.0.0.00000000}.{1d2e3f40-5a6b-7c8d-9e0f-a1b2c3d4e5f6}
+Headphones (USB Audio Device)
 ```
 
 #### Select a Specific Output Device
 
 ```
-snapclient.exe -h <HA-server-ip> -s <device_id>
+snapclient.exe -h <HA-server-ip> -s "<endpoint-GUID>"
 ```
 
-For example, to play through the USB headphones (device 2):
+**Use the GUID, not the friendly name.** On Windows, snapclient stores the endpoint GUID in the field `-s` matches against, and the friendly name only as a description — so `-s "Headphones"` matches nothing.
 
 ```
-snapclient.exe -h 192.168.1.34 -s 2
+snapclient.exe -h 192.168.1.34 -s "{0.0.0.00000000}.{1d2e3f40-5a6b-7c8d-9e0f-a1b2c3d4e5f6}"
 ```
+
+**Avoid numeric indices.** They come from an enumeration of *currently active* devices only, so they shift as devices are plugged in, unplugged, or disabled — `-s 2` can silently become a different device. And on Windows a `-s` value that matches nothing isn't reported as an error; snapclient crashes immediately instead.
+
+Omit `-s` entirely to follow whatever Windows' current default output device is.
 
 #### Multiple Outputs (Multi-Room on One PC)
 
-Run multiple instances, each targeting a different audio device:
+Run multiple instances, each pinned to a different device:
 
 ```
-snapclient.exe -h <HA-server-ip> -s 0 --instance 1
-snapclient.exe -h <HA-server-ip> -s 2 --instance 2
+snapclient.exe -h <HA-server-ip> -s "<speakers-GUID>"  --instance 1
+snapclient.exe -h <HA-server-ip> -s "<headphones-GUID>" --instance 2
 ```
 
-Each instance appears as a separate client in Snapweb and HA, so you can control volumes independently.
+Each instance appears as a separate client in Snapweb, in HA, and in Music Assistant (which registers one player per Snapclient), so you can control them independently. Instance 2 and up get a `#N` suffix on their client ID, e.g. `00:21:6a:7d:74:fc#2`.
+
+Note both instances play at once unless you mute one. Since the add-on sets `send_to_muted = false`, muting a client genuinely stops audio being sent to it, so mute/unmute from HA works as an output selector.
+
+#### Keeping the Client Alive (Windows Default-Device Changes)
+
+**snapclient dies when Windows switches the default output device** — e.g. plugging in headphones. Its WASAPI backend has no device-change handling, so the audio client is invalidated, the player thread throws, and the exception escapes into `std::terminate()`, aborting the process. There is no auto-switch option and no in-process recovery.
+
+The fix is to supervise it externally. A ready-made script is included at [`clients/windows/start_snapclient.vbs`](clients/windows/start_snapclient.vbs): it launches snapclient, blocks until it exits, and restarts it. Because it passes no `-s`, each restart re-resolves the *current* default device — so changing the Windows output device switches snapclient too, after a few seconds of silence.
+
+Edit the `SNAPCLIENT` and `SERVER` values at the top, then drop it in your Startup folder:
+
+```
+%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\
+```
+
+If Windows pops a "snapclient.exe has stopped working" dialog on each crash, it will stall the restart. Suppress it for that one program:
+
+```
+reg add "HKCU\Software\Microsoft\Windows\Windows Error Reporting\ExcludedApplications" /v snapclient.exe /t REG_DWORD /d 1 /f
+```
+
+With the Snapserver Control integration installed, `binary_sensor.<client>_connected` and `sensor.<client>_last_seen` will show you when a client dropped and for how long.
 
 #### Auto-Start on Login (Task Scheduler)
 
@@ -124,15 +155,17 @@ Each instance appears as a separate client in Snapweb and HA, so you can control
 3. Trigger: **When I log on**
 4. Action: **Start a program**
    - Program: `C:\snapclient\snapclient.exe`
-   - Arguments: `-h <HA-server-ip> -s <device_id>`
+   - Arguments: `-h <HA-server-ip> -s "<endpoint-GUID>"`
 5. Finish and check **Open the Properties dialog** → under General, check **Run whether user is logged on or not**
 
 #### Auto-Start as a Windows Service
 
-For headless/always-on setups, install as a Windows service using [NSSM](https://nssm.cc/):
+For headless/always-on setups, install as a Windows service using [NSSM](https://nssm.cc/). NSSM restarts the process on exit by default, so this also covers the crash described below — and unlike the Startup-folder script it runs without anyone logged in:
 
 ```
-nssm install Snapclient "C:\snapclient\snapclient.exe" "-h <HA-server-ip> -s <device_id>"
+nssm install Snapclient "C:\snapclient\snapclient.exe" "-h <HA-server-ip> -s ""<endpoint-GUID>"""
+nssm set Snapclient AppExit Default Restart
+nssm set Snapclient AppRestartDelay 3000
 nssm start Snapclient
 ```
 
@@ -147,7 +180,7 @@ Key options:
 | Option | Description | Example |
 |--------|-------------|---------|
 | `-h <ip>` | Server IP address | `-h 192.168.1.34` |
-| `-s <id>` | Audio output device ID (from `-l`) | `-s 2` |
+| `-s <id>` | Output device: endpoint GUID from `-l` (name match, not the friendly name). Omit to follow the Windows default | `-s "{0.0.0.00000000}.{88299c40-...}"` |
 | `--instance <n>` | Instance number (for multiple clients) | `--instance 1` |
 | `-p <port>` | Server port (default 1704) | `-p 1704` |
 | `--latency <ms>` | Additional latency in ms | `--latency 0` |
