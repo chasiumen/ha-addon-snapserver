@@ -20,6 +20,7 @@ time chasing the wrong thing:
 | Playback resumes on its own after a sample-format change | User had to click play repeatedly; MA rejects commands during its provider reload window. |
 | The whole `snapserver_control` dropdown feature is inert for MA audio | **Codec and buffer both work.** `stream_manager.cpp` fills missing URI keys from the global config, and `bufferMs` has no per-stream override at all. Only `sampleformat` is overridden, because MA always writes it explicitly. |
 | MA's web UI is on port 8094 (from the addon's `ingress_port`) | 8095. 8094 is ingress-only. |
+| HA's stored `music_assistant` integration URL is safe to reuse for a Bearer-token API call | It's frequently the port-8094 ingress-only listener, which has **no Bearer-token fallback at all** (`auth_middleware.py get_authenticated_user`) — every token, however valid, is rejected there. Caught by a real user hitting it live; see `docs/PLAN_ma_sampleformat.md` §9. |
 
 **How to apply:**
 - Read the actual file. `gh api repos/<owner>/<repo>/contents/<path> --jq '.content' | base64 -d`

@@ -420,6 +420,15 @@ else
     fail "config_flow.py missing MA credentials step or write probe"
 fi
 
+# Regression guard: a real user hit MA's HA-Ingress port (8094) being
+# prefilled and unconditionally rejecting every Bearer token. Both the
+# rewrite and the fast-fail guard must stay present.
+if grep -q 'MA_INGRESS_ONLY_PORT' "$COMP_DIR/config_flow.py"; then
+    pass "config_flow.py guards against the HA-Ingress-only port"
+else
+    fail "config_flow.py lost its HA-Ingress-port guard (regression)"
+fi
+
 # --- Test 12: python unit tests ---
 echo ""
 echo "--- Python unit tests ---"
@@ -438,7 +447,7 @@ done
 if [ -z "$PYTHON" ]; then
     echo "  SKIP: python not found, skipping rpc/coordinator tests"
 else
-    for suite in test_rpc.py test_coordinator.py test_entities.py test_ma_client.py; do
+    for suite in test_rpc.py test_coordinator.py test_entities.py test_ma_client.py test_config_flow.py; do
         if "$PYTHON" "$SCRIPT_DIR/$suite" > /tmp/snapserver_$suite.log 2>&1; then
             pass "$suite"
         else

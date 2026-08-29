@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlsplit
 
 import voluptuous as vol
 
@@ -25,6 +26,8 @@ from .const import (
     DEFAULT_RPC_HOST,
     DEFAULT_RPC_PORT,
     DOMAIN,
+    MA_API_PORT,
+    MA_INGRESS_ONLY_PORT,
     MA_INTEGRATION_DOMAIN,
 )
 from .ma_client import (
@@ -49,18 +52,31 @@ def _rpc_schema(host: str, port: int) -> vol.Schema:
 
 
 def _ma_defaults(hass: HomeAssistant) -> tuple[str, str]:
-    """Prefill MA URL/token from HA's own Music Assistant integration entry.
+    """Prefill the MA URL/token from HA's own Music Assistant integration entry.
 
-    MA announces its URL and an auto-minted token to that integration via
-    Supervisor discovery. NOTE: the announced token has role SERVICE, which
-    cannot write provider config (admin only) — so it usually fails the write
-    probe and the user must paste an admin long-lived token; the URL prefill
-    is the part that reliably helps.
+    Two things NOT to trust from that entry, both verified against
+    music-assistant/server source (see docs/PLAN_ma_sampleformat.md):
+
+    - The URL is frequently the Supervisor-discovered HA-Ingress address,
+      port 8094 — a listener that requires Supervisor-injected
+      X-Remote-User-* headers and has NO Bearer-token fallback at all
+      (auth_middleware.py get_authenticated_user). Every token, however
+      valid, is rejected as unauthenticated there. We keep the hostname
+      (it correctly identifies this MA instance) but force the real API
+      port, 8095.
+    - The token is auto-minted with role SERVICE, which lacks
+      CONFIG_PROVIDERS_WRITE (admin-only) — it reliably fails the write
+      probe, so it is intentionally NOT prefilled; the user must paste an
+      admin long-lived token.
     """
     for entry in hass.config_entries.async_entries(MA_INTEGRATION_DOMAIN):
         url = entry.data.get(CONF_URL)
-        if url:
-            return url, entry.data.get(CONF_TOKEN) or ""
+        if not url:
+            continue
+        parts = urlsplit(url)
+        if parts.hostname and parts.port == MA_INGRESS_ONLY_PORT:
+            url = f"{parts.scheme}://{parts.hostname}:{MA_API_PORT}"
+        return url, ""
     return DEFAULT_MA_URL, ""
 
 
@@ -68,6 +84,12 @@ async def _validate_ma(
     hass: HomeAssistant, url: str, token: str
 ) -> tuple[str | None, dict[str, str]]:
     """Validate an MA connection; return (error_key, description_placeholders)."""
+    # Fail fast and specifically: this port structurally cannot accept a
+    # Bearer token (see _ma_defaults), so no token would ever pass here —
+    # retrying with a "better" token would just repeat the same failure.
+    if urlsplit(url).port == MA_INGRESS_ONLY_PORT:
+        return "ma_url_is_ingress_port", {"port": str(MA_API_PORT)}
+
     client = MusicAssistantClient(url, token, async_get_clientsession(hass))
     try:
         instance_id = await client.get_snapcast_instance_id()

@@ -33,6 +33,12 @@ CONF_MA_URL = "ma_url"
 CONF_MA_TOKEN = "ma_token"
 MA_INTEGRATION_DOMAIN = "music_assistant"
 DEFAULT_MA_URL = "http://127.0.0.1:8095"
+# The API port. NOT the same as the HA-Ingress-only port (8094): that listener
+# requires Supervisor-injected X-Remote-User-* headers and has no Bearer-token
+# fallback at all (auth_middleware.py get_authenticated_user), so it rejects
+# every token as unauthenticated, valid or not. See docs/PLAN_ma_sampleformat.md.
+MA_API_PORT = 8095
+MA_INGRESS_ONLY_PORT = 8094
 
 BUFFER_MIN = 500
 BUFFER_MAX = 5000
