@@ -22,7 +22,7 @@
           "configure_ma_later": "Skip for now (Sample Format entity will be unavailable)"
         },
         "data_description": {
-          "ma_url": "Usually http://127.0.0.1:8095 when Music Assistant runs as an addon on this machine.",
+          "ma_url": "Usually http://127.0.0.1:8095 when Music Assistant runs as an addon on this machine. Must end in :8095 (the main web server) — not :8094, which is the Home Assistant-Ingress port and cannot accept any token.",
           "ma_token": "Created in the Music Assistant web UI under your admin user's profile."
         }
       }
@@ -31,6 +31,7 @@
       "addon_not_found": "Snapserver addon not found. Please install the Snapserver addon first.",
       "cannot_connect": "Could not reach Snapserver's control port. Check that the addon is running, then try again.",
       "cannot_connect_ma": "Could not reach Music Assistant or find its Snapcast provider: {error}",
+      "ma_url_is_ingress_port": "That URL is Music Assistant's Home Assistant-Ingress port, which cannot accept a token no matter which one you use. Change the port to {port} (the main Music Assistant web server) and try again.",
       "invalid_ma_token": "Music Assistant rejected the token, or no token was entered. Paste a long-lived token for an admin user (or check the skip option).",
       "ma_token_not_admin": "The token works but lacks admin rights, so it cannot change provider settings. Create the long-lived token under an ADMIN user in the Music Assistant web UI."
     },
@@ -52,7 +53,7 @@
         "data_description": {
           "rpc_host": "Leave this at 127.0.0.1 unless Home Assistant cannot reach the addon over localhost.",
           "rpc_port": "Snapserver's JSON-RPC control port. The addon uses 1705.",
-          "ma_url": "Usually http://127.0.0.1:8095 when Music Assistant runs as an addon on this machine.",
+          "ma_url": "Usually http://127.0.0.1:8095 when Music Assistant runs as an addon on this machine. Must end in :8095 (the main web server) — not :8094, which is the Home Assistant-Ingress port and cannot accept any token.",
           "ma_token": "Leave both MA fields empty to disable the Sample Format entity."
         }
       }
@@ -60,6 +61,7 @@
     "error": {
       "cannot_connect": "Could not reach Snapserver's control port. Check that the addon is running, then try again.",
       "cannot_connect_ma": "Could not reach Music Assistant or find its Snapcast provider: {error}",
+      "ma_url_is_ingress_port": "That URL is Music Assistant's Home Assistant-Ingress port, which cannot accept a token no matter which one you use. Change the port to {port} (the main Music Assistant web server) and try again.",
       "invalid_ma_token": "Music Assistant rejected the token. Paste a long-lived token for an admin user.",
       "ma_token_not_admin": "The token works but lacks admin rights, so it cannot change provider settings. Create the long-lived token under an ADMIN user in the Music Assistant web UI."
     }

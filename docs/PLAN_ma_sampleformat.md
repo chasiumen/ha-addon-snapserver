@@ -224,3 +224,34 @@ timeout 120 bash tests/test_config.sh      # 2 pre-existing failures are ISSUE 3
 - Mono / 44100 (MA hardcodes `channels=2`; 44100 not offered — fact 3).
 - Hot-swap without provider reload (needs an upstream MA change; candidate future PR to music-assistant/server).
 - The pre-existing `control.py` Unix-socket errors in the addon log (separate cross-container issue, tracked in CLAUDE.md; expected to disappear for MA-created streams once external mode is active, but not a goal here).
+
+## 9. Post-implementation fix: the HA-Ingress-port trap (found via live testing)
+
+The first live user hit "Music Assistant rejected the token" on the very first attempt, no
+matter the token. Root cause, verified in
+`music_assistant/controllers/webserver/helpers/auth_middleware.py:80-134,399-420`:
+
+- MA runs an **additional** internal TCP listener on the Supervisor docker-bridge IP at port
+  **8094** (`INGRESS_SERVER_PORT`, `webserver/controller.py:363-366`), alongside the real
+  webserver on port **8095** (`DEFAULT_SERVER_PORT`, same file). Same app, same routes — but
+  `is_request_from_ingress()` detects a request arrived via that specific socket and
+  `get_authenticated_user()` then takes an ingress-only branch requiring Supervisor-injected
+  `X-Remote-User-ID`/`X-Remote-User-Name` headers, with **no Bearer-token fallback whatsoever**
+  ("Require all Ingress headers to be present for security"). A raw Bearer POST to port 8094 is
+  therefore *always* rejected as unauthenticated (401) — independent of whether the token is
+  valid, or even admin.
+- The bug: `config_flow.py`'s `_ma_defaults()` blindly reused `entry.data[CONF_URL]` from HA's
+  own `music_assistant` integration entry — which is frequently the Supervisor-discovered
+  ingress address (port 8094), since that's what `discovery_info.config["port"]` announces.
+
+**Fix applied:** `_ma_defaults()` keeps the discovered hostname but rewrites port 8094 → 8095
+(`MA_API_PORT`/`MA_INGRESS_ONLY_PORT` in `const.py`); it also stops prefilling the auto-minted
+token (always SERVICE-role, always fails the write probe — prefilling it just reproduces this
+exact confusion). `_validate_ma()` additionally fails fast with a specific
+`ma_url_is_ingress_port` error if a user manually enters `:8094`, rather than the generic
+"token rejected" message that sent the user chasing the wrong thing. Covered by
+`tests/test_config_flow.py` (6 tests) and a structural guard in `test_companion.sh`.
+
+**Lesson for future work on this integration:** never trust another integration's stored
+connection details for a *different* auth mechanism (Bearer token vs. ingress headers) without
+verifying which listener that URL/port actually reaches.
