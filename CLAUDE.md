@@ -55,7 +55,41 @@ repo-root/
 ## Windows Client Setup
 - Download `snapclient.exe` from https://github.com/snapcast/snapcast/releases
 - Run: `snapclient.exe -h <HA-server-ip>`
-- Optionally auto-start via Task Scheduler
+- Auto-start via `clients/windows/start_snapclient.vbs` (Startup folder) or NSSM
+
+### Verified snapclient behaviour on Windows (read from snapcast v0.35.0 source)
+
+**It dies on a default-device change, by design gap.** `client/player/wasapi_player.cpp`
+registers no `IMMNotificationClient`, has no `OnDefaultDeviceChanged`, and no
+`AUDCLNT_E_DEVICE_INVALIDATED` recovery. Every HRESULT goes through `CHECK_HR`, which does
+`LOG(FATAL)` + `throw SnapException`. The player runs as `playerThread_ = thread(&Player::worker,
+this)` (`player.cpp:114`) with no try/catch at the thread entry, so the exception escapes the
+thread function and hits `std::terminate()` — the whole process aborts. There is **no** in-process
+recovery and no auto-switch option; external supervision is the only fix. WASAPI is also the only
+real backend in the Windows build (`HAS_WASAPI`), so no `--player` swap avoids it.
+
+**`-s` matches the endpoint GUID, not the friendly name.** `convertToDevice()` sets
+`desc.name = utf8_encode(id)` (the endpoint GUID) and `desc.description = <friendly name>`;
+`getPcmDevice()` (`snapclient.cpp:98-112`) tries the value as an integer index first, then falls
+back to a substring match on `dev.name` — i.e. the GUID. So `-s "Headphones"` never matches.
+`-l` prints `idx: <GUID>` then the friendly name on the following line.
+
+**Numeric indices are unstable**, because the list comes from
+`EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, ...)` — active devices only, so indices shift as
+devices come and go.
+
+**A bad `-s` fails silently on Windows.** No match leaves `idx == -1`; the "PCM device not found"
+log is compiled out (`#if defined(HAS_ALSA)`) and its `exit()` is commented out, then
+`devices->Item(idx - 1, &device)` runs **unchecked** and the null device is dereferenced
+immediately after. Result: an instant crash with no diagnostic.
+
+**Consequence for switching outputs:** with `-s` omitted, snapclient binds to whatever
+`GetDefaultAudioEndpoint(eRender, eConsole)` returns *at start*, and that is re-resolved on every
+start. So supervise + restart gives automatic device following for free, at the cost of a few
+seconds of silence. Pinning two instances by GUID with `--instance 1`/`--instance 2` (ids `MAC` and
+`MAC#2`) is the alternative when both outputs should stay live and be selected from HA; MA
+registers one player per snapclient (`_ids_map` in its snapcast provider), and the addon's
+`send_to_muted = false` means muting really does stop audio to a client.
 
 ## HA Integration Side
 - Install built-in **Snapcast integration** in HA, point at localhost:1704

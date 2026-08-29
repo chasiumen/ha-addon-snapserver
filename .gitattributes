@@ -1,0 +1,4 @@
+# The Windows client scripts are stored byte-for-byte as they run on the client
+# machine. They use LF endings, and core.autocrlf would otherwise rewrite them to
+# CRLF on checkout, so a restored copy would no longer match the original.
+clients/windows/*.vbs -text
