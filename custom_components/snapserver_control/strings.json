@@ -12,11 +12,27 @@
           "rpc_host": "Leave this at 127.0.0.1 unless Home Assistant cannot reach the addon over localhost.",
           "rpc_port": "Snapserver's JSON-RPC control port. The addon uses 1705."
         }
+      },
+      "ma": {
+        "title": "Music Assistant connection",
+        "description": "The stream sample format is owned by Music Assistant, so changing it needs MA's API. This requires a long-lived token for an ADMIN user: open the Music Assistant web UI, go to Settings, open your admin user's profile and create a long-lived token there. The token Home Assistant received automatically is not sufficient (it cannot write provider settings). You can skip this and add it later via the integration's options; until then the Sample Format entity stays unavailable.",
+        "data": {
+          "ma_url": "Music Assistant URL",
+          "ma_token": "Admin long-lived token",
+          "configure_ma_later": "Skip for now (Sample Format entity will be unavailable)"
+        },
+        "data_description": {
+          "ma_url": "Usually http://127.0.0.1:8095 when Music Assistant runs as an addon on this machine.",
+          "ma_token": "Created in the Music Assistant web UI under your admin user's profile."
+        }
       }
     },
     "error": {
       "addon_not_found": "Snapserver addon not found. Please install the Snapserver addon first.",
-      "cannot_connect": "Could not reach Snapserver's control port. Check that the addon is running, then try again."
+      "cannot_connect": "Could not reach Snapserver's control port. Check that the addon is running, then try again.",
+      "cannot_connect_ma": "Could not reach Music Assistant or find its Snapcast provider: {error}",
+      "invalid_ma_token": "Music Assistant rejected the token, or no token was entered. Paste a long-lived token for an admin user (or check the skip option).",
+      "ma_token_not_admin": "The token works but lacks admin rights, so it cannot change provider settings. Create the long-lived token under an ADMIN user in the Music Assistant web UI."
     },
     "abort": {
       "already_configured": "Snapserver Control is already configured."
@@ -26,19 +42,26 @@
     "step": {
       "init": {
         "title": "Snapserver Control",
-        "description": "Where to reach Snapserver's JSON-RPC control socket. Saving reconnects the integration.",
+        "description": "Where to reach Snapserver's JSON-RPC control socket, and optionally Music Assistant (URL plus an ADMIN long-lived token, created in the MA web UI under your admin user's profile) for the Sample Format entity. Saving reconnects the integration.",
         "data": {
           "rpc_host": "Snapserver host",
-          "rpc_port": "Control port"
+          "rpc_port": "Control port",
+          "ma_url": "Music Assistant URL",
+          "ma_token": "Admin long-lived token"
         },
         "data_description": {
           "rpc_host": "Leave this at 127.0.0.1 unless Home Assistant cannot reach the addon over localhost.",
-          "rpc_port": "Snapserver's JSON-RPC control port. The addon uses 1705."
+          "rpc_port": "Snapserver's JSON-RPC control port. The addon uses 1705.",
+          "ma_url": "Usually http://127.0.0.1:8095 when Music Assistant runs as an addon on this machine.",
+          "ma_token": "Leave both MA fields empty to disable the Sample Format entity."
         }
       }
     },
     "error": {
-      "cannot_connect": "Could not reach Snapserver's control port. Check that the addon is running, then try again."
+      "cannot_connect": "Could not reach Snapserver's control port. Check that the addon is running, then try again.",
+      "cannot_connect_ma": "Could not reach Music Assistant or find its Snapcast provider: {error}",
+      "invalid_ma_token": "Music Assistant rejected the token. Paste a long-lived token for an admin user.",
+      "ma_token_not_admin": "The token works but lacks admin rights, so it cannot change provider settings. Create the long-lived token under an ADMIN user in the Music Assistant web UI."
     }
   },
   "services": {
@@ -54,11 +77,11 @@
     },
     "set_sampleformat": {
       "name": "Set Sample Format",
-      "description": "Change the Snapserver sample format (rate:bits:channels). This restarts the server and briefly disconnects all clients.",
+      "description": "Change Music Assistant's Snapcast stream format (rate:bits:channels). This reloads the MA Snapcast provider (about 10 seconds of audio interruption) and does NOT restart the Snapserver addon. Requires the Music Assistant connection to be configured.",
       "fields": {
         "sampleformat": {
           "name": "Sample Format",
-          "description": "Sample format as rate:bits:channels (e.g., 48000:16:2)"
+          "description": "Sample format as rate:bits:channels (16-bit only, e.g. 48000:16:2)"
         }
       }
     },

@@ -26,8 +26,10 @@ for f in \
     "const.py" \
     "coordinator.py" \
     "entity.py" \
+    "ma_client.py" \
     "manifest.json" \
     "number.py" \
+    "resume.py" \
     "rpc.py" \
     "select.py" \
     "sensor.py" \
@@ -355,6 +357,69 @@ else
     fail "card must escape client-supplied text"
 fi
 
+# --- Test 11b: MA-backed sample format ---
+echo ""
+echo "--- MA-backed sample format ---"
+
+MACLIENT="$COMP_DIR/ma_client.py"
+
+# ma_client.py stays free of Home Assistant imports so tests/test_ma_client.py
+# can exercise it standalone.
+if grep -q '^from homeassistant\|^import homeassistant' "$MACLIENT"; then
+    fail "ma_client.py must not import homeassistant"
+else
+    pass "ma_client.py has no homeassistant imports"
+fi
+
+for symbol in MusicAssistantApiError MusicAssistantAuthError MusicAssistantScopeError; do
+    if grep -q "class $symbol" "$MACLIENT"; then
+        pass "ma_client.py defines $symbol"
+    else
+        fail "ma_client.py missing $symbol"
+    fi
+done
+
+for cmd in "config/providers" "config/providers/get_value" "config/providers/save"; do
+    if grep -q "\"$cmd\"" "$MACLIENT"; then
+        pass "ma_client.py uses $cmd"
+    else
+        fail "ma_client.py missing command $cmd"
+    fi
+done
+
+# The sample-format select must go through MA, not the Supervisor.
+if grep -q 'apply_sampleformat' "$SELECT"; then
+    pass "select.py routes sample format through Music Assistant"
+else
+    fail "select.py should call ma_client's apply_sampleformat"
+fi
+
+# Sample format options: 16-bit only (snapserver <= 0.35.0 lacks packed_s24le),
+# no 44100 and no mono (MA does not support either).
+if grep -q '"192000:16:2"' "$COMP_DIR/const.py"; then
+    pass "const.py offers 192000:16:2"
+else
+    fail "const.py missing 192000:16:2"
+fi
+
+if grep -q '"44100' "$COMP_DIR/const.py"; then
+    fail "const.py must not offer 44100 (MA does not support it)"
+else
+    pass "const.py has no 44100 option"
+fi
+
+if grep -q ':24:' "$COMP_DIR/const.py"; then
+    fail "const.py must not offer 24-bit (snapserver <= 0.35.0 lacks packed_s24le)"
+else
+    pass "const.py has no 24-bit option"
+fi
+
+if grep -q 'ma_url' "$COMP_DIR/config_flow.py" && grep -q 'probe_write_access' "$COMP_DIR/config_flow.py"; then
+    pass "config_flow.py collects MA credentials and probes write access"
+else
+    fail "config_flow.py missing MA credentials step or write probe"
+fi
+
 # --- Test 12: python unit tests ---
 echo ""
 echo "--- Python unit tests ---"
@@ -373,7 +438,7 @@ done
 if [ -z "$PYTHON" ]; then
     echo "  SKIP: python not found, skipping rpc/coordinator tests"
 else
-    for suite in test_rpc.py test_coordinator.py; do
+    for suite in test_rpc.py test_coordinator.py test_entities.py test_ma_client.py; do
         if "$PYTHON" "$SCRIPT_DIR/$suite" > /tmp/snapserver_$suite.log 2>&1; then
             pass "$suite"
         else

@@ -1,5 +1,37 @@
 # Snapserver HA Addon
 
+## RULE: Verify from source. Never assume.
+
+**Do not state anything about how snapcast, Home Assistant, Music Assistant, the Supervisor
+API, or Windows behaves unless it has been read from the actual source, config, or official
+docs in this session.** Not from memory, not from "how it usually works", not from plausible
+inference. If it hasn't been verified, either verify it before answering or say plainly that
+it is unverified — and label a hypothesis as a hypothesis, never as a finding.
+
+**Why:** this project spans five codebases that each behave differently from the obvious
+expectation. Every confident guess made here has been wrong, and each one cost real debugging
+time chasing the wrong thing:
+
+| Assumed | Actually |
+|---|---|
+| `-s "Headphones"` selects a device by name | `-s` substring-matches `desc.name`, which WASAPI sets to the endpoint **GUID**; the friendly name goes in `desc.description`. Name matching never works. |
+| Addon restart failed because Supervisor returned partial options and wiped the config | Disproved by the addon log — every option was present and correct both restarts. |
+| The 2 failing `test_config.sh` checks were long-standing | An **uncommitted working-tree regression** in `run.sh`; the committed code was correct. |
+| Playback resumes on its own after a sample-format change | User had to click play repeatedly; MA rejects commands during its provider reload window. |
+| The whole `snapserver_control` dropdown feature is inert for MA audio | **Codec and buffer both work.** `stream_manager.cpp` fills missing URI keys from the global config, and `bufferMs` has no per-stream override at all. Only `sampleformat` is overridden, because MA always writes it explicitly. |
+| MA's web UI is on port 8094 (from the addon's `ingress_port`) | 8095. 8094 is ingress-only. |
+
+**How to apply:**
+- Read the actual file. `gh api repos/<owner>/<repo>/contents/<path> --jq '.content' | base64 -d`
+  works for upstream repos and has been reliable here; `gh search` is not available with this token.
+- Cite what was checked — file and line, or the tag/version — so a claim can be re-checked later.
+  Pin to the version actually deployed (this addon installs snapcast **v0.35.0**; MA ships its
+  own **0.34.0**).
+- Prefer the user's own logs over any reasoning about what "should" happen. They are ground truth
+  and have overturned several confident conclusions in this project.
+- When a previous statement turns out wrong, correct it plainly and move on. Do not restate a
+  limitation as if it were a finished answer when the user is asking for it to be fixed.
+
 ## Goal
 Create a Home Assistant Snapserver addon. The user wants to stream audio from Navidrome (via Music Assistant on HA) to a Windows PC's speakers using Snapcast.
 
@@ -428,10 +460,35 @@ No GitHub releases/tags exist yet (`git tag -l` is empty), so HACS will track th
 branch rather than showing a real version number. Cutting releases (e.g. `v0.3.0` for the addon,
 a `snapserver_control-vX.Y.Z` tag for the integration) would clean this up but wasn't requested.
 
+## Implemented: MA-Backed Sample-Format Control
+
+The sample-format dropdown currently writes the addon's `[stream]` default, which Music
+Assistant overrides per-stream — so it has no audible effect (codec and buffer DO work; see
+the verified table in the rule section). The fix reworks `select.snapserver_sample_format`
+to write Music Assistant's provider config via MA's `POST /api` (admin long-lived token
+required — the auto-minted HA token lacks `CONFIG_PROVIDERS_WRITE`), with verify-after-write
+and best-effort auto-resume of playback.
+
+**Implemented per [docs/PLAN_ma_sampleformat.md](docs/PLAN_ma_sampleformat.md)** (the plan's
+ground-truth table holds the file:line citations for every behavioral claim). As built:
+`ma_client.py` (HA-free MA API client: instance lookup, get_value, merge-save with 90s timeout,
+no-op-save write probe, verify-after-write, apply_sampleformat), `resume.py` (best-effort
+auto-resume of playing MA players after the provider reload), `select.py` split (codec →
+Supervisor+restart, sampleformat → MA, entity unique_id preserved), config flow `ma` step with
+skip option + options-flow fields, reworked `set_sampleformat` service, 16-bit-only options.
+Suites: test_ma_client.py (18), test_entities.py (19), test_companion.sh 92 checks.
+
+Who owns which audio setting: codec = addon config (MA omits codec= from its stream URI),
+buffer = addon config (server-global, no per-stream override), sampleformat = MA provider
+config (MA bakes it into its Stream.AddStream URI).
+
 ## Status
 Addon includes MA control script and config descriptions. Server-side audio quality controls
 and client status monitoring are both shipped in the `snapserver_control` companion
-integration, which is now installable via HACS as well as manual copy.
+integration, which is now installable via HACS as well as manual copy. The sample-format
+entity is reworked to write Music Assistant's provider config (the only place the value is
+honored) — implemented per docs/PLAN_ma_sampleformat.md, verified locally by the test suites,
+not yet verified against the live HA instance (see the plan's section 7 checklist).
 
 **Tests:** `tests/test_companion.sh` 76/76 pass (this runs the two Python suites, 18 tests,
 as its last section). `tests/test_config.sh` 66/68 — the 2 failures come from an uncommitted

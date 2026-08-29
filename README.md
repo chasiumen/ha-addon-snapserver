@@ -230,14 +230,14 @@ This repo is both an add-on repository (`repository.yaml`, used above for the Sn
 
 Future updates: click **Update** in HACS, then restart HA — no manual file copying.
 
-During setup you are asked for the Snapserver control socket. Leave it at `127.0.0.1:1705` unless Home Assistant cannot reach the addon over localhost; you can change it later via the integration's **Configure** button.
+During setup you are asked for the Snapserver control socket (leave it at `127.0.0.1:1705` unless Home Assistant cannot reach the addon over localhost) and for a Music Assistant connection — see below. Both can be changed later via the integration's **Configure** button.
 
 This creates:
 
 | Entity | Type | Description |
 |--------|------|-------------|
 | `select.snapserver_audio_codec` | Select | Switch between flac, pcm, opus, vorbis |
-| `select.snapserver_sample_format` | Select | Change sample rate/depth/channels |
+| `select.snapserver_sample_format` | Select | Change Music Assistant's stream sample rate (16-bit stereo) |
 | `number.snapserver_buffer_size` | Slider | Adjust buffer 500-5000ms |
 | `sensor.snapserver_clients_connected` | Sensor | How many clients are connected, with the full roster as an attribute |
 | `sensor.snapserver_stream_status` | Sensor | Whether the stream is `playing` or `idle` |
@@ -252,7 +252,24 @@ Plus, for every Snapcast client the server knows about, its own device with:
 
 Services for automations: `snapserver_control.set_codec`, `snapserver_control.set_sampleformat`, `snapserver_control.set_buffer`, and `snapserver_control.delete_client` (permanently forget a client that will never reconnect, e.g. a machine whose network adapter changed).
 
-**Note:** Changing codec, sample format, or buffer restarts the Snapserver addon, which briefly disconnects all clients (1-3 seconds). The status entities do not — they read Snapserver's control API and never restart anything.
+**Who owns which audio setting** (each control targets the one place its value is actually honored):
+
+| Setting | Written to | Effect of changing it |
+|---------|-----------|----------------------|
+| Codec | Snapserver addon config | Addon restarts (~1-3s client disconnect) |
+| Buffer | Snapserver addon config | Addon restarts (~1-3s client disconnect) |
+| Sample format | **Music Assistant provider config** | MA reloads its Snapcast provider (~10s audio dip); the addon is NOT restarted |
+
+The split exists because Music Assistant bakes its own `sampleformat` into every stream it creates, overriding the addon's global default — while codec and buffer genuinely come from the addon. The status entities never restart anything.
+
+#### Sample format setup (Music Assistant connection)
+
+The sample-format entity needs a **long-lived token for an admin user** of Music Assistant — the token MA hands to Home Assistant automatically cannot write provider settings. One-time setup:
+
+1. Open the Music Assistant web UI → **Settings** → open your (admin) user's profile → create a **long-lived token**.
+2. In HA: **Settings > Devices & Services > Snapserver Control > Configure** → fill in the MA URL (usually `http://127.0.0.1:8095`) and paste the token.
+
+Behavior on change: MA is switched to "use external server" mode automatically (pointing at this addon), the provider reloads (~10 seconds of silence), and if music was playing the integration re-issues play automatically once the players return. Options are 16-bit only — snapserver v0.35.0 cannot ingest MA's packed 24-bit format (snapcast PR #1532 is unreleased), so don't select 24-bit inside MA's own UI either.
 
 ### Client Status Card
 
